@@ -462,9 +462,9 @@ Full nodes determine whether those blocks satisfy consensus rules.
 
 # Suggested Follow-up Reading
 
-* `core-code.md` — Mapping these concepts to Bitcoin Core.
-* `experiment.md` — Reproducing double-spending behavior in a simplified laboratory.
-* `lab/double_spend_lab.py` — Executable educational implementation.
+* [Mapping these concepts to Bitcoin Core.](core-code.md)
+* [Reproducing double-spending behavior in a simplified laboratory.](experiment.md)
+* [Executable educational implementation.](experiment.md)
 
 ---
 
