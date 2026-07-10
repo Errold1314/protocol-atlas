@@ -242,10 +242,12 @@ After completing this unit, you should understand:
 
 # Files in This Unit
 
-* **whitepaper.md** — Evidence from the Bitcoin White Paper
-* **core-code.md** — Bitcoin Core source-code navigation
-* **experiment.md** — Reproducible experiment guide
-* **lab/double_spend_lab.py** — Executable educational model
+# Files in This Unit
+
+- [Evidence from the Bitcoin White Paper](whitepaper.md)
+- [Bitcoin Core Source Code Walkthrough](core-code.md)
+- [Reproducible Experiment Guide](experiment.md)
+- [Executable UTXO Laboratory](lab/double_spend_lab.py)
 
 ---
 
