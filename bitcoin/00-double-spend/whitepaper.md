@@ -11,7 +11,7 @@ Original text: [Bitcoin: A Peer-to-Peer Electronic Cash System](https://bitcoin.
 Double-spending is not “someone copying coins,” but rather multiple conflicting transactions attempting to spend the same existing output.
 The challenge with Bitcoin is getting distributed nodes to agree on which transaction should be included in the valid history.
 
-White Paper Evidence: How Bitcoin Prevents Double-Spending
+## White Paper Evidence: How Bitcoin Prevents Double-Spending
 
 Original Text: [Bitcoin: A Peer-to-Peer Electronic Cash System](https://bitcoin.org/bitcoin.pdf)
 
