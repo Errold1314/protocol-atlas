@@ -1,61 +1,480 @@
-# Evidence from the White Paper
+# Evidence from the Bitcoin White Paper
 
-- Section 2, “Transactions”: Why Digital Signatures Are Not Enough to Prevent Double-Spending
-- Section 4, “Proof-of-Work”: Why Modifying the History Requires Re-doing the Work
-- Section 5, “Network”: Transaction Broadcast, Block Validation, Forks, and Chain Selection
+> **Research Goal:** Explain how Bitcoin prevents double-spending using evidence from the original white paper and connect those ideas to modern Bitcoin Core concepts.
 
-Original text: [Bitcoin: A Peer-to-Peer Electronic Cash System](https://bitcoin.org/bitcoin.pdf)
+**Primary Reference**
 
-## My Understanding
+> Satoshi Nakamoto. *Bitcoin: A Peer-to-Peer Electronic Cash System* (2008)
+> https://bitcoin.org/bitcoin.pdf
 
-Double-spending is not “someone copying coins,” but rather multiple conflicting transactions attempting to spend the same existing output.
-The challenge with Bitcoin is getting distributed nodes to agree on which transaction should be included in the valid history.
+---
 
-## White Paper Evidence: How Bitcoin Prevents Double-Spending
+# Overview
 
-Original Text: [Bitcoin: A Peer-to-Peer Electronic Cash System](https://bitcoin.org/bitcoin.pdf)
+The double-spending problem is one of the fundamental challenges in digital money.
 
-This article corresponds to Section 2 (Transactions), Section 4 (Proof-of-Work), and Section 5 (Network) of the white paper.
+Unlike physical cash, digital information can be copied perfectly. If no trusted authority exists, the network must determine which transaction represents the legitimate transfer of ownership.
 
-## 1. Why Can’t Digital Signatures Alone Solve the Double-Spending Problem?
+Bitcoin solves this problem without relying on banks or centralized payment processors.
 
-Digital signatures address the issue of **authorization**: they prove that a private-key holder consents to transferring a certain amount of value to a new public key.
+Instead, it combines:
 
-However, signatures cannot answer another question: Has the same owner already signed away this value to someone else? Alice could sign two valid transactions using the same input; both signatures might be correct in themselves.
+* cryptographic signatures,
+* public transaction history,
+* distributed validation,
+* Proof of Work,
+* and chain selection based on cumulative work.
 
-Therefore, Bitcoin also requires the network to establish a single, public history of transaction order. The key idea in Section 2 of the white paper is that, to confirm there are no earlier conflicting transactions, participants must be able to understand the transaction history and reach consensus on which transaction was accepted first.
+These mechanisms together allow independent nodes to converge on a single shared history.
 
-## 2. Why Does PoW Make Tampering with the History Expensive?
+---
 
-A block records the hash of the previous block within itself. If an attacker modifies a transaction in an earlier block, the block’s hash will change, rendering the hash of the previous block stored in subsequent blocks invalid.
+# White Paper Sections Relevant to Double-Spending
 
-Proof of Work requires miners to continuously try different nonces until the block’s hash meets the current difficulty target. Verifying a valid block is inexpensive, but creating one requires a large number of random attempts.
+This document primarily refers to the following sections of the Bitcoin white paper.
 
-Therefore, if an attacker wants to rewrite a transaction that has already been confirmed, they must not only re-mine the modified block but also re-mine all subsequent blocks and catch up to the ever-increasing workload of the honest network. The more confirmations a transaction has, the lower the probability of successfully catching up.
+| Section    | Topic            | Relevance                                            |
+| ---------- | ---------------- | ---------------------------------------------------- |
+| Section 2  | Transactions     | Ownership transfer and digital signatures            |
+| Section 3  | Timestamp Server | Public ordering of transactions                      |
+| Section 4  | Proof of Work    | Preventing inexpensive history modification          |
+| Section 5  | Network          | Validation, broadcasting, forks, and chain selection |
+| Section 11 | Calculations     | Probability of a successful attack                   |
 
-## 3. How do nodes choose the same chain during a fork?
+---
 
-When two miners find blocks almost simultaneously, the network may temporarily fork. Some nodes receive Block A first, while others receive Block B first; they can temporarily continue working on the branch they see.
+# Section 2 — Transactions
 
-The rule in the white paper is: nodes accept the **valid chain with the most cumulative work** and continue mining at the end of that chain. The commonly referred to “longest chain” does not simply mean the one with more blocks, but the one with more cumulative Proof-of-Work (PoW) invested.
+## What the White Paper Says
 
-When one branch gains a new valid block and takes the lead, nodes on the other branch will switch to the chain with the higher cumulative work. Blocks that have not been incorporated into the final main chain are called stale blocks; if the transactions within them have not yet been confirmed by the main chain, they may be returned to the pool of candidate transactions to await packaging.
+Bitcoin represents ownership as a chain of digitally signed transactions.
 
-## A Complete Anti-Double-Spend Chain
+Each transaction spends one or more outputs created by previous transactions.
 
-1. Alice uses her private key to sign and construct a transaction that spends an existing UTXO.
-2. The transaction is broadcast to nodes; nodes verify the signature, inputs, and other consensus rules.
-3. Miners package valid transactions into candidate blocks and calculate a PoW that meets the difficulty requirement for the block.
-4. Successful blocks are broadcast; nodes only accept blocks where the transaction is valid, the inputs have not been spent, and the PoW is correct.
-5. If a temporary fork exists, nodes select the valid chain with the highest cumulative work.
-6. Subsequent blocks continue to be added, making it increasingly costly to rewrite this history.
+Instead of transferring balances between accounts, Bitcoin transfers the right to spend existing outputs.
 
-## Differences from Common Misconceptions
+---
 
-- **“Signatures prevent double-spending” is inaccurate.** Signatures only prove the right to spend; network consensus determines which of the conflicting spends becomes the valid history.
-- **“Longest chain” should not be understood solely as the chain with the most blocks.** The correct focus is on the valid chain with the most cumulative work.
-- **“Confirmation” is not mathematically irreversible.** It is an economic security guarantee that strengthens as subsequent work increases.
+## Why Digital Signatures Alone Are Not Enough
 
-## Next Steps for Verification
+Digital signatures answer one important question:
 
-In the Bitcoin Core regtest environment, create two conflicting transactions that spend the same input. Observe that nodes accept only one of them into the valid chain, and observe chain selection after manually creating a fork.
+> **Did the owner authorize this transaction?**
+
+They do **not** answer another equally important question:
+
+> **Has this output already been spent somewhere else?**
+
+Consider the following situation.
+
+```text
+Funding Transaction
+
+Alice owns:
+
+Funding:0
+   │
+   ▼
+1 BTC
+```
+
+Alice creates two different transactions.
+
+```text
+Funding:0
+    │
+    ├────────► Tx-A → Bob
+    │
+    └────────► Tx-B → Carol
+```
+
+Both transactions contain:
+
+* valid signatures;
+* correctly formatted data;
+* identical inputs.
+
+If signatures alone determined validity, both transactions would appear acceptable.
+
+The network therefore requires additional rules.
+
+---
+
+## The Missing Information
+
+A signature proves authorization.
+
+It does **not** prove uniqueness.
+
+Nodes must know whether the referenced output is currently unspent.
+
+This is why Bitcoin maintains a shared transaction history.
+
+Only one transaction may consume a particular output within a valid chain.
+
+---
+
+# The UTXO Model
+
+Although the white paper does not explicitly use the modern term **UTXO**, the concept naturally follows from its transaction model.
+
+A transaction output has two possible states.
+
+```text
+UNSPENT
+    │
+    ▼
+Referenced by a valid transaction
+    │
+    ▼
+SPENT
+```
+
+Once spent, that output can never become spendable again within the same blockchain history.
+
+This simple state transition forms the foundation of Bitcoin's ownership model.
+
+---
+
+# Section 3 — Timestamp Server
+
+## Why Ordering Matters
+
+If conflicting transactions exist, the network must determine which one happened first.
+
+Bitcoin accomplishes this without a central clock.
+
+Instead, blocks create a public chronological ordering of accepted transactions.
+
+```text
+Transaction
+      │
+      ▼
+Candidate Block
+      │
+      ▼
+Proof of Work
+      │
+      ▼
+Accepted History
+```
+
+The timestamp server does not merely record time.
+
+It records **ordering**.
+
+Ordering is what allows every node to agree which transaction consumed an output first.
+
+---
+
+# Section 4 — Proof of Work
+
+## Why History Cannot Be Modified Cheaply
+
+Every block contains the hash of the previous block.
+
+```text
+Block A
+   │
+hash
+   ▼
+Block B
+   │
+hash
+   ▼
+Block C
+```
+
+Changing any transaction inside Block A changes its hash.
+
+That immediately invalidates Block B.
+
+Which also invalidates Block C.
+
+An attacker must therefore rebuild every descendant block.
+
+---
+
+## Why Proof of Work Matters
+
+Proof of Work transforms history modification from a simple editing task into a computational race.
+
+Creating a valid block requires repeated hashing until the block satisfies the network difficulty target.
+
+Verification is inexpensive.
+
+Creation is intentionally expensive.
+
+This asymmetry allows nodes to verify blocks quickly while making history modification economically costly.
+
+---
+
+# Section 5 — Network
+
+## Transaction Broadcast
+
+When a user creates a transaction, it is broadcast across the peer-to-peer network.
+
+Each node independently verifies:
+
+* transaction structure;
+* signatures;
+* referenced outputs;
+* consensus rules.
+
+Only valid transactions continue propagating.
+
+---
+
+## Independent Validation
+
+Every node performs the same validation process.
+
+No central server decides whether a transaction is valid.
+
+Consensus emerges because every participant follows identical rules.
+
+```text
+Transaction
+      │
+      ▼
+Node A validates
+Node B validates
+Node C validates
+Node D validates
+      │
+      ▼
+Same validation rules
+      │
+      ▼
+Same result
+```
+
+---
+
+## Temporary Forks
+
+Sometimes two miners discover blocks almost simultaneously.
+
+```text
+Genesis
+    │
+    ├──────── Block A
+    │
+    └──────── Block B
+```
+
+Both blocks may be valid.
+
+Different nodes may temporarily follow different branches.
+
+This situation is expected.
+
+It is not a failure of consensus.
+
+---
+
+# Chain Selection
+
+Eventually one branch gains another valid block.
+
+```text
+Genesis
+    │
+    ├──────── Block A
+    │
+    └──────── Block B
+                 │
+                 ▼
+              Block C
+```
+
+Now the second branch has accumulated more Proof of Work.
+
+Nodes reorganize to that branch.
+
+The white paper commonly refers to this as following the **longest chain**.
+
+Modern Bitcoin Core terminology is more precise.
+
+Nodes select:
+
+> **the valid chain with the greatest cumulative Proof of Work (chainwork).**
+
+Block count alone is not the deciding factor.
+
+---
+
+# Why Chainwork Is More Accurate Than "Longest Chain"
+
+Suppose two branches exist.
+
+```text
+Chain A
+
+100
+101
+102
+103
+```
+
+```text
+Chain B
+
+100
+101
+102
+```
+
+If Chain B somehow contains more accumulated work because of different difficulty adjustments, it represents the stronger chain.
+
+Security depends on cumulative work, not visual length.
+
+For this reason, modern Bitcoin documentation generally discusses **chainwork** instead of simply counting blocks.
+
+---
+
+# Section 11 — Probability of an Attack
+
+The white paper analyzes an attacker attempting to rewrite confirmed history.
+
+The attacker's probability of success decreases as confirmation depth increases.
+
+More confirmations mean:
+
+* more Proof of Work;
+* more accumulated chainwork;
+* greater computational cost;
+* lower probability of catching up.
+
+Bitcoin therefore provides **probabilistic finality**, not absolute finality.
+
+---
+
+# Putting Everything Together
+
+The complete process can be summarized as follows.
+
+```text
+User Creates Transaction
+            │
+            ▼
+Digital Signature
+            │
+            ▼
+Broadcast to Network
+            │
+            ▼
+Independent Node Validation
+            │
+            ▼
+UTXO Verification
+            │
+            ▼
+Accepted into Mempool
+            │
+            ▼
+Included in Candidate Block
+            │
+            ▼
+Proof of Work
+            │
+            ▼
+Block Validation
+            │
+            ▼
+Chain Selection
+            │
+            ▼
+Confirmed Transaction
+```
+
+Each stage contributes a different security property.
+
+---
+
+# Responsibilities of Each Mechanism
+
+| Mechanism          | Responsibility                              |
+| ------------------ | ------------------------------------------- |
+| Digital Signature  | Proves authorization                        |
+| Transaction Format | Defines valid state transitions             |
+| UTXO Set           | Determines whether outputs remain spendable |
+| Full Nodes         | Validate transactions and blocks            |
+| Mempool            | Stores candidate transactions               |
+| Miners             | Produce candidate blocks                    |
+| Proof of Work      | Establishes objective ordering              |
+| Chain Selection    | Determines the active blockchain            |
+
+---
+
+# Common Misconceptions
+
+## "Bitcoin prevents double-spending with signatures."
+
+Incorrect.
+
+Signatures prove ownership.
+
+They do not determine whether an output has already been consumed.
+
+---
+
+## "The longest chain wins."
+
+Incomplete.
+
+Bitcoin follows the **valid chain with the greatest cumulative Proof of Work**.
+
+---
+
+## "Blocks make transactions irreversible."
+
+Incorrect.
+
+Blocks increase the cost of rewriting history.
+
+Finality is economic and probabilistic.
+
+---
+
+## "Miners decide what is valid."
+
+Incorrect.
+
+Miners propose blocks.
+
+Full nodes determine whether those blocks satisfy consensus rules.
+
+---
+
+# Key Takeaways
+
+* Digital signatures prove authorization, not uniqueness.
+* The UTXO model prevents an output from being spent twice within one valid history.
+* Public ordering is required to resolve conflicting transactions.
+* Proof of Work makes rewriting history computationally expensive.
+* Independent validation removes the need for a trusted authority.
+* Chainwork determines the active blockchain.
+* Confirmation depth increases economic security against history reorganization.
+
+---
+
+# Suggested Follow-up Reading
+
+* `core-code.md` — Mapping these concepts to Bitcoin Core.
+* `experiment.md` — Reproducing double-spending behavior in a simplified laboratory.
+* `lab/double_spend_lab.py` — Executable educational implementation.
+
+---
+
+# References
+
+1. Satoshi Nakamoto. *Bitcoin: A Peer-to-Peer Electronic Cash System* (2008).
+   https://bitcoin.org/bitcoin.pdf
+
+2. Bitcoin Core Documentation
+   https://github.com/bitcoin/bitcoin
+
+3. Bitcoin Developer Reference
+   https://developer.bitcoin.org/
